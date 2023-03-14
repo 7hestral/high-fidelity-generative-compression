@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from skimage.measure import structural_similarity
+from skimage.metrics import structural_similarity
 import torch
 from torch.autograd import Variable
 
