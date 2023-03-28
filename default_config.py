@@ -20,11 +20,13 @@ class Datasets(object):
     OPENIMAGES = 'openimages'
     CITYSCAPES = 'cityscapes'
     JETS = 'jetimages'
+    COCO2017 = 'coco2017'
 
 class DatasetPaths(object):
     OPENIMAGES = 'data/openimages'
     CITYSCAPES = ''
     JETS = ''
+    COCO2017 = 'data/coco2017'
 
 class directories(object):
     experiments = 'experiments'
@@ -34,16 +36,16 @@ class args(object):
     Shared config
     """
     name = 'hific_v0.1'
-    silent = True
+    silent = False
     n_epochs = 8
     n_steps = 1e6
     batch_size = 8
     log_interval = 1000
     save_interval = 50000
     gpu = 0
-    multigpu = True
-    dataset = Datasets.OPENIMAGES
-    dataset_path = DatasetPaths.OPENIMAGES
+    multigpu = False
+    dataset = Datasets.COCO2017
+    dataset_path = DatasetPaths.COCO2017
     shuffle = True
 
     # GAN params

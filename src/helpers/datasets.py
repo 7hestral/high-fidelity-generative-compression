@@ -12,6 +12,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, datasets
+from pycocotools.coco import COCO
 
 DIR = os.path.abspath(os.path.dirname(__file__))
 COLOUR_BLACK = 0
@@ -20,7 +21,8 @@ NUM_DATASET_WORKERS = 4
 SCALE_MIN = 0.75
 SCALE_MAX = 0.95
 DATASETS_DICT = {"openimages": "OpenImages", "cityscapes": "CityScapes", 
-                 "jetimages": "JetImages", "evaluation": "Evaluation"}
+                 "jetimages": "JetImages", "evaluation": "Evaluation",
+                 "coco2017": "CocoDetection"}
 DATASETS = list(DATASETS_DICT.keys())
 
 def get_dataset(dataset):
@@ -291,6 +293,80 @@ class CityScapes(datasets.Cityscapes):
                          split=mode,
                          transform=self._transforms(scale=np.random.uniform(0.5,1.0), 
                             H=512, W=1024))
+
+class CocoDetection(Dataset):
+    def __init__(self, mode, root=os.path.join(DIR, 'data/coco2017'), transforms=None, crop_size=256, normalize=False,
+                 logger=logging.getLogger(__name__)
+                 ):
+        if mode == 'train':
+            path2data = os.path.join(root, "train2017")
+            path2json = os.path.join(root, "annotations/instances_train2017.json")
+        elif mode == 'validation':
+            path2data = os.path.join(root, "val2017")
+            path2json = os.path.join(root, "annotations/instances_val2017.json")
+        else:
+            print("Unknown mode")
+            return
+        self.logger = logger
+        self.transforms = transforms
+        self.root = path2data
+        self.coco = COCO(path2json)
+        self.ids = list(sorted(self.coco.imgs.keys()))
+
+        self.crop_size = crop_size
+        self.image_dims = (3, self.crop_size, self.crop_size)
+        self.scale_min = SCALE_MIN
+        self.scale_max = SCALE_MAX
+        self.normalize = normalize
+
+    def _get_transforms(self, scale, H, W):
+        """
+        Up(down)scale and randomly crop to `crop_size` x `crop_size`
+        """
+        transforms_list = [  # transforms.ToPILImage(),
+            transforms.RandomHorizontalFlip(),
+            transforms.Resize((math.ceil(scale * H), math.ceil(scale * W))),
+            transforms.RandomCrop(self.crop_size),
+            transforms.ToTensor()]
+
+        if self.normalize is True:
+            transforms_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+
+        return transforms.Compose(transforms_list)
+
+    def _load_image(self, id):
+        file_name = self.coco.loadImgs(id)[0]["file_name"]
+        path = os.path.join(self.root, file_name)
+        filesize = os.path.getsize(path)
+        img = PIL.Image.open(path).convert("RGB")
+        W, H = img.size  # slightly confusing
+        bpp = filesize * 8. / (H * W)
+
+        shortest_side_length = min(H, W)
+
+        minimum_scale_factor = float(self.crop_size) / float(shortest_side_length)
+        scale_low = max(minimum_scale_factor, self.scale_min)
+        scale_high = max(scale_low, self.scale_max)
+        scale = np.random.uniform(scale_low, scale_high)
+
+        if self.transforms is not None:
+            transformed = self.transforms(img)
+        else:
+            dynamic_transform = self._get_transforms(scale, H, W)
+            transformed = dynamic_transform(img)
+
+        return transformed, bpp
+
+
+    def __getitem__(self, index):
+        id = self.ids[index]
+        image, bpp = self._load_image(id)
+
+        return image, bpp
+
+    def __len__(self) -> int:
+        return len(self.ids)
+
 
 def preprocess(root, size=(64, 64), img_format='JPEG', center_crop=None):
     """Preprocess a folder of images.
