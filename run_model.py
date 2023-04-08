@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+import argparse
 import os
 import glob
 import urllib
@@ -9,10 +9,32 @@ import collections
 from compress import prepare_model, prepare_dataloader, compress_and_save, load_and_decompress, compress_and_decompress
 from PIL import Image
 
-INPUT_DIR = './content/files'
-STAGING_DIR = './content/stage'
-OUT_DIR = './content/out'
-CKPT_DIR = './ckpt'
+parser = argparse.ArgumentParser(description='Model compression')
+parser.add_argument('--compress_ratio_encoder', type=float, default=0.2)
+parser.add_argument('--compress_ratio_generator', type=float, default=0.2)
+parser.add_argument('--compress_ratio_hyperprior', type=float, default=0.2)
+
+cmd_args = parser.parse_args()
+# compress_ratio = cmd_args.compress_ratio
+# compress_ratio_str = str(compress_ratio).replace('.', 'dot')
+compress_ratio_encoder = cmd_args.compress_ratio_encoder
+print('compress_ratio_encoder', compress_ratio_encoder)
+compress_ratio_encoder_str = str(compress_ratio_encoder).replace('.', 'dot')
+
+compress_ratio_generator = cmd_args.compress_ratio_generator
+print('compress_ratio_generator', compress_ratio_generator)
+compress_ratio_generator_str = str(compress_ratio_generator).replace('.', 'dot')
+
+compress_ratio_hyperprior = cmd_args.compress_ratio_hyperprior
+print('compress_ratio_hyperprior', compress_ratio_hyperprior)
+
+compress_ratio_hyperprior_str = str(compress_ratio_hyperprior).replace('.', 'dot')
+model_name = f"compressed_encoder{compress_ratio_encoder_str}_generator{compress_ratio_generator_str}_hyperprior{compress_ratio_hyperprior}_hific_med"
+
+INPUT_DIR = f'/scratch/ssd004/scratch/ruizhu/hific/content/files'
+STAGING_DIR = f'/scratch/ssd004/scratch/ruizhu/hific/{model_name}/stage'
+OUT_DIR = f'/scratch/ssd004/scratch/ruizhu/hific/{model_name}/out'
+CKPT_DIR = '/scratch/ssd004/scratch/ruizhu/hific/ckpt'
 DEFAULT_IMAGE_PREFIX = ('https://storage.googleapis.com/hific/clic2020/images/originals/')
 
 File = collections.namedtuple('File', ['output_path', 'compressed_path',
@@ -44,18 +66,24 @@ def get_default_image(output_dir, image_choice="portrait"):
     print('Downloading', default_image_url, '\n->', output_path)
     urllib.request.urlretrieve(default_image_url, output_path)
 #
-model_path = './ckpt/hific_med.pt'
+model_path = os.path.join(CKPT_DIR, 'hific_med.pt')
+
+compressed_model_dict = torch.load(os.path.join(CKPT_DIR, f'{model_name}.pt')).state_dict()
+
+
 first_model_init = False
 
-default_image = "portrait"
+# default_image = "portrait"
 
-get_default_image(INPUT_DIR, default_image)
+# get_default_image(INPUT_DIR, default_image)
 
 all_files = os.listdir(INPUT_DIR)
 print(f'Got following files ({len(all_files)}):')
 scale_factor = 2 if len(all_files) == 1 else 4
 print(torch.cuda.is_available())
+
 model, args = prepare_model(model_path, STAGING_DIR)
+model.load_state_dict(compressed_model_dict)
 data_loader = prepare_dataloader(args, INPUT_DIR, OUT_DIR)
 compress_and_save(model, args, data_loader, OUT_DIR)
 all_outputs = []

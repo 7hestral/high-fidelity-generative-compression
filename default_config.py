@@ -26,7 +26,7 @@ class DatasetPaths(object):
     OPENIMAGES = 'data/openimages'
     CITYSCAPES = ''
     JETS = ''
-    COCO2017 = 'data/coco2017'
+    COCO2017 = '/scratch/ssd002/datasets/MSCOCO2017'
 
 class directories(object):
     experiments = 'experiments'
@@ -43,7 +43,7 @@ class args(object):
     log_interval = 1000
     save_interval = 50000
     gpu = 0
-    multigpu = False
+    multigpu = True
     dataset = Datasets.COCO2017
     dataset_path = DatasetPaths.COCO2017
     shuffle = True
